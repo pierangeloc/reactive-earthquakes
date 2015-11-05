@@ -31,11 +31,12 @@ object EarthquakeParser extends StreamingFacilities {
     } yield EarthquakeEvent(time, lat, long, elev, magnitude, place)
   )
 
-  implicit def EarthquakeEventEncodeJson: EncodeJson[EarthquakeEvent] = jencode6L((e: EarthquakeEvent) => (e.time, e.lat, e.long, e.elevation, e.magnitude, e.place))("time", "lat", "long", "elevation", "magnitude", "place")
+  implicit def EarthquakeEventEncodeJson: EncodeJson[EarthquakeEvent] = jencode6L(
+    (e: EarthquakeEvent) =>
+      (e.time, e.lat, e.long, e.elevation, e.magnitude, e.place))("time", "lat", "long", "elevation", "magnitude", "place")
 
   /**
-   * This source emits strings as they come from the resource
-   * @param resource
+   * This source emits strings as they come from any text file
    */
   def source(resource: String): Source[String, Future[Long]] = {
     println(s"getting events from $resource")

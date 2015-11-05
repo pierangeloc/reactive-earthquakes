@@ -18,7 +18,7 @@ import scala.util.{Failure, Success}
  * Serve the earthquake stream to each websocket, separately, with time dictated by server.
  * Client can pass in the ws request the time multiplier, which determines how fast we want events to be replayed
  */
-object EarthquakeServer extends App with StreamingFacilities {
+object EarthquakeServer extends App with ServerBox {
 
   val echoFlow: Flow[Message, TextMessage, Unit] = Flow[Message].collect {case tm: TextMessage => TextMessage(Source.single("Hello ") ++ tm.textStream)}
 
@@ -64,15 +64,7 @@ object EarthquakeServer extends App with StreamingFacilities {
     }
 
 
+  runServer(route)("Earthquake Server", 9091)
 
-  //  val connectionsSource: Source[IncomingConnection, Future[ServerBinding]] = Http().bind("localhost", 9091)
-  val connectionsSource: Future[ServerBinding] = Http().bindAndHandle(route, "localhost", 9091)
-
-  //  connectionsSource.runForeach(connection => connection.handleWithSyncHandler(webSocketRequestHandler))
-
-  connectionsSource.onComplete {
-    case Success(binding) => println(s"Server ready, serving on port ${binding.localAddress.getPort}")
-    case Failure(e) => println(s"Cannot bind, reason: ${e.getMessage}")
-  }
 
 }
