@@ -6,7 +6,7 @@ Using Akka-Streams to parse earthquakes events monthly dump and replaying them i
 ###N.B.
 The file provided by USGS ([http://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson](http://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson)) 
 contains events in a time descending order, from most recent to oldest, but we need to replay them in the opposite order, therefore we produce the `all_month_asc.geojson` file 
-with a simple Unix command:
+with a simple command:
 
 OS  | command
 ------------- | -------------
