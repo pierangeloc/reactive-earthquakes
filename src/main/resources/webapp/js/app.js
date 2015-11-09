@@ -9,6 +9,28 @@ var initialize = function(map) {
         data: eventsArray
     });
 
+    //timeseries('timeseries', getData(new Date(2012, 1, 1), new Date(2015, 1, 2), amount), false);
+
+    var domEl = 'timeseries';
+    var data = [] ;//{'value': 1380854103662},{'value': 1363641921283}];
+    var brushEnabled = false;
+
+
+    var updateTimeseries = function(evt) {
+        data.push({'value': parseInt(evt.time)});
+
+        $('#timeseries').empty();
+        timeseries(domEl, data, brushEnabled);
+    };
+
+
+
+
+    var amount = 100;
+    if (window.innerWidth < 800)
+        amount = 30;
+
+
     var eventLog = [];
 
     heatmap.setMap(map);
@@ -22,7 +44,7 @@ var initialize = function(map) {
         document.getElementById('timeline').value = eventLog.join('\n');
 
 
-    }
+    };
 
     events.onopen = function(evt) {
         console.log("ws connection accepted");
@@ -32,17 +54,25 @@ var initialize = function(map) {
         var event = JSON.parse(msg.data);
         console.log('event occurred: ' + JSON.stringify(event));
         appendEvent(event);
+        updateTimeseries(event);
 
         eventsArray.push({location: new google.maps.LatLng(event.lat, event.long), weight: Math.ceil(event.magnitude)});
 
         //items.push({id: 7, content: 'item 7', start: '2015-04-27'})
         //let's drop also a marker that will vanish after a while:
         var marker = new google.maps.Marker({
+            label: {
+                text: '' + Math.round(event.magnitude),
+                color: 'purple',
+                fontSize: Math.round(14 / 3.0 * event.magnitude) + 'px'
+            },
             map: map,
             icon: getCircle(event.magnitude),
             draggable: false,
             animation: google.maps.Animation.DROP,
             position: {lat: event.lat, lng: event.long}
+
+
         });
         window.setTimeout(function() {
             removeMarker(marker);
@@ -63,7 +93,8 @@ var initialize = function(map) {
             fillOpacity: .5,
             scale: Math.pow(2, magnitude),
             strokeColor: 'white',
-            strokeWeight: .7
+            strokeWeight: .7,
+
         };
         return circle;
     }

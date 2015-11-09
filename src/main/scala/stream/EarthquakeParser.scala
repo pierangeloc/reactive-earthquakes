@@ -20,6 +20,7 @@ object EarthquakeParser extends StreamingFacilities {
 
   case class EarthquakeEvent(time: Long, lat: Double, long: Double, elevation: Double, magnitude: Double, place: String)
 
+  /** decoder **/
   implicit def EarthquakeEventDecodeJson: DecodeJson[EarthquakeEvent] = DecodeJson (
     c => for {
       long <- (c --\ "geometry" --\ "coordinates" =\ 0).as[Double]
@@ -31,6 +32,7 @@ object EarthquakeParser extends StreamingFacilities {
     } yield EarthquakeEvent(time, lat, long, elev, magnitude, place)
   )
 
+  /** encoder **/
   implicit def EarthquakeEventEncodeJson: EncodeJson[EarthquakeEvent] = jencode6L(
     (e: EarthquakeEvent) =>
       (e.time, e.lat, e.long, e.elevation, e.magnitude, e.place))("time", "lat", "long", "elevation", "magnitude", "place")
@@ -40,7 +42,9 @@ object EarthquakeParser extends StreamingFacilities {
    */
   def source(resource: String): Source[String, Future[Long]] = {
     println(s"getting events from $resource")
+
     val inputStream = getClass.getClassLoader.getResourceAsStream(resource)
+
     InputStreamSource(() => inputStream)
       .via(Framing.delimiter(ByteString(",\n"), Int.MaxValue))
       .map(bytestring => bytestring.decodeString("UTF-8"))
@@ -83,41 +87,49 @@ object EarthquakeParser extends StreamingFacilities {
     (broadcast.in, zip.out)
   }
 
-  /**
-   * Sink that just logs
-   * @tparam T
-   * @return
-   */
-  def loggerSink[T]: Sink[T, Future[Int]] = Sink.fold(0) { (index, elem) => println(s"$index-th element: $elem"); index + 1}
-
-
-  //back pressure is defined in terms of readline events
-  //  earthquakeEventsSource("all_month.geojson")
-
-  //  adjacentEventsSource(earthquakesDump)
-  //                    .map(s => {StdIn.readLine(); s})
-  //                    .to(loggerSink).run()
+}
 
 
 
 
-  //  replayedEvents(earthquakesDump).to(loggerSink).run()
 
 
-  //  adjacentEventsSource(earthquakesDump).mapAsync(1)(x => after(1000 millisecond, actorSystem.scheduler)(Future.successful(x)))
 
-  //  adjacentEventsSource(earthquakesDump).map {
-  //                                            case (event1: EarthquakeEvent, event2: EarthquakeEvent) => {
-  //                                              val waitingTime = (event2.time - event1.time) / scaleFactor
-  //                                              println(s"waiting $waitingTime [ms]")
-  //                                              event2
-  //                                            }
-  //                                        }.buffer(1, OverflowStrategy.backpressure) .to(loggerSink).run()
+object AdjacentExtractor extends App with StreamingFacilities {
+  import EarthquakeParser._
+
+  Source(List(1,2,3,4))
+    .via(adjacentElementsExtractor)
+    .to(loggerSink).run()
 
 }
 
-object Test extends App with StreamingFacilities {
+
+
+
+
+
+object FastEvents extends App with StreamingFacilities {
   import EarthquakeParser._
   source(earthquakesDump).to(loggerSink).run()
+}
+
+
+
+
+
+
+
+object SlowEvents extends App with StreamingFacilities {
+  import EarthquakeParser._
+  source(earthquakesDump)
+  .mapAsync(4)(s => after (1000 millisecond, actorSystem.scheduler)(Future.successful(s)))
+  .to(loggerSink).run()
 
 }
+
+
+
+
+
+

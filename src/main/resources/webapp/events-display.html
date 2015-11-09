@@ -9,9 +9,17 @@
 
     </style>
     <script src="js/jquery-2.1.4.js"></script>
+    <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+    <script type="text/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/lodash.js/3.1.0/lodash.min.js"></script>
+    <script type="text/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/moment.js/2.9.0/moment.min.js"></script>
+    <script type="text/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/highlight.js/8.4/highlight.min.js"></script>
 
     <script src="js/app.js"></script>
+    <script src="js/timeseries.js"></script>
+
     <link href="css/bootstrap.min.css" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" href="css/timeseries.css" />
+
 </head>
 <body>
 
@@ -21,6 +29,8 @@
 
         </textarea>
     </div>
+    <div id="timeseries" class="timeseries"></div>
+
     <div id="map"></div>
 
 <script>
