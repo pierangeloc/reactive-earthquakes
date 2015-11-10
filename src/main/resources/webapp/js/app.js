@@ -14,21 +14,18 @@ var initialize = function(map) {
     var domEl = 'timeseries';
     var data = [] ;//{'value': 1380854103662},{'value': 1363641921283}];
     var brushEnabled = false;
-
+    var TIME_SERIES_RETENTION = 100;
 
     var updateTimeseries = function(evt) {
         data.push({'value': parseInt(evt.time)});
+        if (data.length == TIME_SERIES_RETENTION) {
+            data = data.slice(1, data.length)
+        }
 
         $('#timeseries').empty();
         timeseries(domEl, data, brushEnabled);
     };
 
-
-
-
-    var amount = 100;
-    if (window.innerWidth < 800)
-        amount = 30;
 
 
     var eventLog = [];

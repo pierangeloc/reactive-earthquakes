@@ -40,7 +40,7 @@ object EarthquakeParser extends StreamingFacilities {
   /**
    * This source emits strings as they come from any text file
    */
-  def source(resource: String): Source[String, Future[Long]] = {
+  def strings(resource: String): Source[String, Future[Long]] = {
     println(s"getting events from $resource")
 
     val inputStream = getClass.getClassLoader.getResourceAsStream(resource)
@@ -59,13 +59,14 @@ object EarthquakeParser extends StreamingFacilities {
   }
 
   /** Source of events extracted from json, when parsable **/
-  def earthquakeEventsSource(s: String): Source[EarthquakeEvent, Future[Long]] = source(s).map(jsonToEvent).filter(_.isDefined).map(_.get)
+  def earthquakeEvents(s: String): Source[EarthquakeEvent, Future[Long]] = strings(s).map(jsonToEvent).filter(_.isDefined).map(_.get)
 
   /** Source of adjacent events from json **/
-  def adjacentEventsSource(s: String): Source[(EarthquakeEvent, EarthquakeEvent), Future[Long]] = earthquakeEventsSource(s).via(adjacentElementsExtractor[EarthquakeEvent])
+  def adjacentEvents(s: String): Source[(EarthquakeEvent, EarthquakeEvent), Future[Long]] = earthquakeEvents(s).via(adjacentElementsExtractor[EarthquakeEvent])
 
-  val scaleFactor = 500L
-  def replayedEvents(s: String): Source[EarthquakeEvent, Future[Long]] = adjacentEventsSource(s).buffer(1, OverflowStrategy.backpressure).mapAsync[EarthquakeEvent](1) {
+  // 1 h --> 10 s
+  val scaleFactor = 360L
+  def replayedEvents(s: String): Source[EarthquakeEvent, Future[Long]] = adjacentEvents(s).buffer(1, OverflowStrategy.backpressure).mapAsync[EarthquakeEvent](1) {
                                             case (event1: EarthquakeEvent, event2: EarthquakeEvent) => {
                                               val waitingTime = (event2.time - event1.time) / scaleFactor
                                               println(s"waiting $waitingTime [ms]")
@@ -111,7 +112,7 @@ object AdjacentExtractor extends App with StreamingFacilities {
 
 object FastEvents extends App with StreamingFacilities {
   import EarthquakeParser._
-  source(earthquakesDump).to(loggerSink).run()
+  strings(earthquakesDump).to(loggerSink).run()
 }
 
 
@@ -122,7 +123,7 @@ object FastEvents extends App with StreamingFacilities {
 
 object SlowEvents extends App with StreamingFacilities {
   import EarthquakeParser._
-  source(earthquakesDump)
+  strings(earthquakesDump)
   .mapAsync(4)(s => after (1000 millisecond, actorSystem.scheduler)(Future.successful(s)))
   .to(loggerSink).run()
 

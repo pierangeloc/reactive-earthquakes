@@ -22,6 +22,7 @@ object EarthquakeServer extends App with ServerBox {
 
   val echoFlow: Flow[Message, TextMessage, Unit] = Flow[Message].collect {case tm: TextMessage => TextMessage(Source.single("Hello ") ++ tm.textStream)}
 
+  //this is simplified with streams 2.0
   val eventsTriggerFlow: Flow[Message, Message, Unit] = Flow() { implicit builder =>
     import FlowGraph.Implicits._
 
@@ -39,18 +40,6 @@ object EarthquakeServer extends App with ServerBox {
 
     (inputFlow.inlet, concat.out)
 
-  }
-
-
-
-  val webSocketRequestHandler: HttpRequest => HttpResponse = {
-    case request @ HttpRequest(HttpMethods.GET, Uri.Path("/websocket"), _, _, _) =>
-      println("received request")
-      request.header[UpgradeToWebsocket] match {
-        case Some(websocketHeader) => websocketHeader.handleMessages(eventsTriggerFlow)
-        case _ => HttpResponse(status = StatusCodes.Unauthorized)
-      }
-    case _ => HttpResponse(status = StatusCodes.Unauthorized)
   }
 
   val route: Route =
