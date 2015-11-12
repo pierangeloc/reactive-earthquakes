@@ -1,7 +1,7 @@
 
 var initialize = function(map) {
     console.log("calling initMap");
-    var events = new WebSocket("ws://localhost:9091/earthquakes");
+    var events = new WebSocket("ws://localhost:8080/earthquakes");
 
     var eventsArray = new google.maps.MVCArray([]);
 

@@ -15,3 +15,10 @@ Mac  | `tail -r all_month.geojson > all_month_asc.geojson`
 
 This file must be in our classpath, we saved it in the resources folder.
 
+
+
+###How to run the app
+- Run the `FileServer` application, adjusting the location of the `.geojson` file to serve. This simply serves the requested file as a chunked response
+- Run the `EarthquakeServer` application
+- Access the earthquakes visualization on [http://localhost:8080/world/events-display.html](http://localhost:8080/world/events-display.html)
+

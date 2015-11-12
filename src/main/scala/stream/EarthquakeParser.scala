@@ -1,5 +1,7 @@
 package stream
 
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.{HttpResponse, HttpRequest}
 import akka.pattern._
 import akka.stream.OverflowStrategy
 import akka.stream.io.{Framing, InputStreamSource}
@@ -10,6 +12,7 @@ import argonaut._
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.util.Success
 
 
 object EarthquakeParser extends StreamingFacilities {
@@ -40,7 +43,7 @@ object EarthquakeParser extends StreamingFacilities {
   /**
    * This source emits strings as they come from any text file
    */
-  def strings(resource: String): Source[String, Future[Long]] = {
+  def strings(resource: String): Source[String, Any] = {
     println(s"getting events from $resource")
 
     val inputStream = getClass.getClassLoader.getResourceAsStream(resource)
@@ -51,6 +54,24 @@ object EarthquakeParser extends StreamingFacilities {
   }
 
   /**
+   * This source emits the strings extracted from the chunked response provided by the file server
+   */
+  def remoteStrings(remoteUrl: String): Future[Source[String, Any]] = {
+    val req = HttpRequest(uri = remoteUrl)
+    val res: Future[HttpResponse] = Http().singleRequest(req)
+    res.map {
+        response => {
+          println("received response")
+          response.entity.dataBytes
+            .via(
+          Framing.delimiter(ByteString(",\n"), maximumFrameLength = 20000, allowTruncation = true))
+            .map(bytestring => bytestring.decodeString("UTF-8"))
+        }
+      }
+  }
+
+
+  /**
    * map String to decoded EarthquakeEvent
    * @param s
    */
@@ -59,14 +80,14 @@ object EarthquakeParser extends StreamingFacilities {
   }
 
   /** Source of events extracted from json, when parsable **/
-  def earthquakeEvents(s: String): Source[EarthquakeEvent, Future[Long]] = strings(s).map(jsonToEvent).filter(_.isDefined).map(_.get)
+  def earthquakeEvents(src: Source[String, Any]): Source[EarthquakeEvent, Any] = src.map(jsonToEvent).filter(_.isDefined).map(_.get)
 
   /** Source of adjacent events from json **/
-  def adjacentEvents(s: String): Source[(EarthquakeEvent, EarthquakeEvent), Future[Long]] = earthquakeEvents(s).via(adjacentElementsExtractor[EarthquakeEvent])
+  def adjacentEvents(src: Source[String, Any]): Source[(EarthquakeEvent, EarthquakeEvent), Any] = earthquakeEvents(src).via(adjacentElementsExtractor[EarthquakeEvent])
 
   // 1 h --> 10 s
   val scaleFactor = 360L
-  def replayedEvents(s: String): Source[EarthquakeEvent, Future[Long]] = adjacentEvents(s).buffer(1, OverflowStrategy.backpressure).mapAsync[EarthquakeEvent](1) {
+  def replayedEvents(src: Source[String, Any]): Source[EarthquakeEvent, Any] = adjacentEvents(src).buffer(1, OverflowStrategy.backpressure).mapAsync[EarthquakeEvent](1) {
                                             case (event1: EarthquakeEvent, event2: EarthquakeEvent) => {
                                               val waitingTime = (event2.time - event1.time) / scaleFactor
                                               println(s"waiting $waitingTime [ms]")
@@ -117,17 +138,40 @@ object FastEvents extends App with StreamingFacilities {
 
 
 
-
-
-
-
 object SlowEvents extends App with StreamingFacilities {
   import EarthquakeParser._
   strings(earthquakesDump)
-  .mapAsync(4)(s => after (1000 millisecond, actorSystem.scheduler)(Future.successful(s)))
-  .to(loggerSink).run()
+    .mapAsync(1)(s => after (1000 millisecond, actorSystem.scheduler)(Future.successful(s)))
+    .to(loggerSink).run()
 
 }
+
+
+object FastRemoteEvents extends App with StreamingFacilities {
+  import EarthquakeParser._
+  remoteStrings("http://localhost:8081/earthquakes").onComplete {
+    case Success(src) => {
+      src.to(loggerSink).run() }
+    case _ => println("Boom!")
+  }
+
+}
+
+
+object SlowRemoteEvents extends App with StreamingFacilities {
+  import EarthquakeParser._
+  remoteStrings("http://localhost:8081/earthquakes").onComplete {
+    case Success(src) => {
+      src.mapAsync(1)(s => after (1000 millisecond, actorSystem.scheduler)(Future.successful(s)))
+        .to(loggerSink).run()
+    }
+    case _ => println("Boom!")
+  }
+
+}
+
+
+
 
 
 

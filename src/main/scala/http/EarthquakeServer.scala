@@ -20,27 +20,7 @@ import scala.util.{Failure, Success}
  */
 object EarthquakeServer extends App with ServerBox {
 
-  val echoFlow: Flow[Message, TextMessage, Unit] = Flow[Message].collect {case tm: TextMessage => TextMessage(Source.single("Hello ") ++ tm.textStream)}
-
-  //this is simplified with streams 2.0
-  val eventsTriggerFlow: Flow[Message, Message, Unit] = Flow() { implicit builder =>
-    import FlowGraph.Implicits._
-
-    val concat = builder.add(Merge[Message](2))
-//    val eventSource: Outlet[Strict] = builder.add(EarthquakeParser.replayedEvents("all_month.geojson").map(event => TextMessage.Strict(event.toString)))
-    val eventSource: Outlet[Strict] = builder.add(EarthquakeParser.replayedEvents(EarthquakeParser.earthquakesDump)
-                                                  .map(EarthquakeParser.eventToJson)
-                                                  .map(event => TextMessage.Strict(event.toString)))
-
-    //we absorb the input message
-    val inputFlow = builder.add(Flow[Message].filter(_ => false))
-
-    inputFlow   ~> concat
-    eventSource ~> concat
-
-    (inputFlow.inlet, concat.out)
-
-  }
+  val eventsUrl = "http://localhost:8081/earthquakes"
 
   val route: Route =
     pathPrefix("world") {
@@ -49,11 +29,23 @@ object EarthquakeServer extends App with ServerBox {
       }
     } ~
     path("earthquakes") {
-      handleWebsocketMessages(eventsTriggerFlow)
+      onSuccess(EarthquakeParser.remoteStrings(eventsUrl)) {
+        import EarthquakeParser._
+        source => {
+          val replayedEventsAsWsJson: Source[Message, Any] = replayedEvents(source)
+                                                              .map(EarthquakeParser.eventToJson)
+                                                              .map(event => TextMessage.Strict(event.toString))
+
+          val eventFlow: Flow[Message, Message, Unit] = Flow.wrap(Sink.ignore, replayedEventsAsWsJson)(Keep.none)
+
+          handleWebsocketMessages(eventFlow)
+        }
+
+      }
     }
 
 
-  runServer(route)("Earthquake Server", 9091)
+  runServer(route)("Earthquake Server", 8080)
 
 
 }
