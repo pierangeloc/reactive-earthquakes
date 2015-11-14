@@ -80,14 +80,16 @@ object EarthquakeParser extends StreamingFacilities {
   }
 
   /** Source of events extracted from json, when parsable **/
-  def earthquakeEvents(src: Source[String, Any]): Source[EarthquakeEvent, Any] = src.map(jsonToEvent).filter(_.isDefined).map(_.get)
+  def earthquakeEvents(src: Source[String, Any]): Source[EarthquakeEvent, Any] = src.map(jsonToEvent).collect {
+    case Some(event) => event
+  }
 
   /** Source of adjacent events from json **/
   def adjacentEvents(src: Source[String, Any]): Source[(EarthquakeEvent, EarthquakeEvent), Any] = earthquakeEvents(src).via(adjacentElementsExtractor[EarthquakeEvent])
 
   // 1 h --> 10 s
   val scaleFactor = 360L
-  def replayedEvents(src: Source[String, Any]): Source[EarthquakeEvent, Any] = adjacentEvents(src).buffer(1, OverflowStrategy.backpressure).mapAsync[EarthquakeEvent](1) {
+  def replayedEvents(src: Source[String, Any]): Source[EarthquakeEvent, Any] = adjacentEvents(src).mapAsync[EarthquakeEvent](1) {
                                             case (event1: EarthquakeEvent, event2: EarthquakeEvent) => {
                                               val waitingTime = (event2.time - event1.time) / scaleFactor
                                               println(s"waiting $waitingTime [ms]")
@@ -97,7 +99,7 @@ object EarthquakeParser extends StreamingFacilities {
 
   def eventToJson(e: EarthquakeEvent): String = e.asJson.spaces2
 
-  def adjacentElementsExtractor[T] = Flow() { implicit builder =>
+  def adjacentElementsExtractor[T]: Flow[T, (T, T), Unit] = Flow() { implicit builder =>
     import FlowGraph.Implicits._
 
     val broadcast = builder.add(Broadcast[T](2))
@@ -158,18 +160,17 @@ object FastRemoteEvents extends App with StreamingFacilities {
 }
 
 
-object SlowRemoteEvents extends App with StreamingFacilities {
+object ReplayedEvents extends App with StreamingFacilities {
   import EarthquakeParser._
   remoteStrings("http://localhost:8081/earthquakes").onComplete {
     case Success(src) => {
-      src.mapAsync(1)(s => after (1000 millisecond, actorSystem.scheduler)(Future.successful(s)))
+      replayedEvents(src)
         .to(loggerSink).run()
     }
     case _ => println("Boom!")
   }
 
 }
-
 
 
 
